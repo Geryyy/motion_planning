@@ -62,11 +62,21 @@ def path_length(P: np.ndarray) -> float:
 
 def curvature_cost(P: np.ndarray) -> float:
     """
-    Simple discrete curvature proxy: sum of squared second differences.
-    Low value -> smoother curve.
+    Discrete bending energy approximation: integral(kappa^2 ds).
+    Low value -> smoother, less sharply curved paths.
     """
-    D2 = P[:-2] - 2.0 * P[1:-1] + P[2:]
-    return float(np.sum(np.sum(D2 * D2, axis=1)))
+    P = np.asarray(P, dtype=float)
+    n = P.shape[0]
+    if n < 3:
+        return 0.0
+    du = 1.0 / float(n - 1)
+    d1 = np.gradient(P, du, axis=0)
+    d2 = np.gradient(d1, du, axis=0)
+    speed = np.linalg.norm(d1, axis=1)
+    cross = np.linalg.norm(np.cross(d1, d2), axis=1)
+    eps = 1e-9
+    kappa = cross / np.maximum(speed, eps) ** 3
+    return float(np.sum((kappa * kappa) * speed) * du)
 
 
 def mean_turn_angle_deg(P: np.ndarray, eps: float = 1e-12) -> float:

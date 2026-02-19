@@ -36,7 +36,7 @@ def main():
     start = (-0.4, -0.2, 1.50)
     goal = goal_t
 
-    n_vias = 3
+    n_vias = 2
     common_opt = dict(
         scene=scene,
         start=start,
@@ -44,18 +44,18 @@ def main():
         n_vias=n_vias,
         moving_block_size=moving_block_size,
         safety_margin=0.0,
-        preferred_safety_margin=0.03,
+        preferred_safety_margin=0.02,
         relax_preferred_final_fraction=0.25,
-        approach_only_clearance=0.025,
+        approach_only_clearance=0.015,
         contact_window_fraction=0.08,
         start_yaw_deg=start_yaw_deg,
         goal_yaw_deg=goal_yaw_deg,
         n_yaw_vias=n_vias,
         combined_4d=True,
-        w_len=1.0,
+        w_len=3.5,
         approach_fraction=0.25,
-        w_via_dev=0.4,
-        w_yaw_monotonic=150.0,
+        w_via_dev=0.06,
+        w_yaw_monotonic=80.0,
         yaw_goal_reach_u=0.5,
         init_offset_scale=0.7,
         method="Powell",
@@ -68,16 +68,16 @@ def main():
         **common_opt,
         n_samples_curve=61,
         collision_check_subsample=3,
-        w_curv=0.20,
+        w_curv=0.08,
         w_yaw_smooth=0.006,
         w_safe=300.0,
-        w_safe_preferred=25.0,
+        w_safe_preferred=18.0,
         w_approach_rebound=180.0,
         w_goal_clearance=20.0,
         w_goal_clearance_target=120.0,
         w_approach_clearance=280.0,
         w_approach_collision=900.0,
-        w_yaw_dev=0.08,
+        w_yaw_dev=0.04,
         w_yaw_schedule=35.0,
         options={"maxiter": 80, "xtol": 3e-3, "ftol": 3e-3},
     )
@@ -86,20 +86,20 @@ def main():
         **common_opt,
         n_samples_curve=101,
         collision_check_subsample=1,
-        w_curv=0.25,
+        w_curv=0.12,
         w_yaw_smooth=0.008,
         w_safe=380.0,
-        w_safe_preferred=40.0,
+        w_safe_preferred=24.0,
         w_approach_rebound=280.0,
         w_goal_clearance=35.0,
         w_goal_clearance_target=260.0,
         w_approach_clearance=420.0,
         w_approach_collision=1400.0,
-        w_yaw_dev=0.10,
+        w_yaw_dev=0.05,
         w_yaw_schedule=55.0,
         init_vias=vias1,
         init_yaw_vias_deg=np.asarray(info1["yaw_ctrl_deg"], dtype=float)[1:-1],
-        options={"maxiter": 120, "xtol": 1e-3, "ftol": 1e-3},
+        options={"maxiter": 160, "xtol": 1e-3, "ftol": 1e-3},
     )
     opt_duration = time.time() - t_start
     print(f"Two-stage optimization took {opt_duration:.2f} seconds")
@@ -225,6 +225,11 @@ def main():
         f"mean_clearance: {info['mean_clearance']:+.4f} m, "
         f"required_clearance: {info['required_clearance']:+.4f} m, "
         f"preferred_clearance: {info['preferred_clearance']:+.4f} m"
+    )
+    straight_len = float(np.linalg.norm(np.asarray(goal, dtype=float) - np.asarray(start, dtype=float)))
+    print(
+        f"path_efficiency: {info['length'] / max(straight_len, 1e-9):.3f}x "
+        f"(length={info['length']:.3f} m, straight={straight_len:.3f} m)"
     )
 
 
