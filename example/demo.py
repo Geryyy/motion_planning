@@ -37,13 +37,10 @@ def main():
     goal = goal_t
 
     n_vias = 3
-
-    # Two-stage optimization: fast coarse solve, then warm-started refine.
-    t_start = time.time()
-    S1, vias1, info1 = optimize_bspline_path(
-        scene,
-        start,
-        goal,
+    common_opt = dict(
+        scene=scene,
+        start=start,
+        goal=goal,
         n_vias=n_vias,
         moving_block_size=moving_block_size,
         safety_margin=0.0,
@@ -51,72 +48,57 @@ def main():
         relax_preferred_final_fraction=0.25,
         approach_only_clearance=0.025,
         contact_window_fraction=0.08,
-        n_samples_curve=61,
-        collision_check_subsample=3,
         start_yaw_deg=start_yaw_deg,
         goal_yaw_deg=goal_yaw_deg,
         n_yaw_vias=n_vias,
         combined_4d=True,
         w_len=1.0,
+        approach_fraction=0.25,
+        w_via_dev=0.4,
+        w_yaw_monotonic=150.0,
+        yaw_goal_reach_u=0.5,
+        init_offset_scale=0.7,
+        method="Powell",
+        goal_clearance_target=0.0,
+    )
+
+    # Two-stage optimization: fast coarse solve, then warm-started refine.
+    t_start = time.time()
+    _, vias1, info1 = optimize_bspline_path(
+        **common_opt,
+        n_samples_curve=61,
+        collision_check_subsample=3,
         w_curv=0.20,
         w_yaw_smooth=0.006,
         w_safe=300.0,
         w_safe_preferred=25.0,
         w_approach_rebound=180.0,
         w_goal_clearance=20.0,
-        goal_clearance_target=0.0,
         w_goal_clearance_target=120.0,
         w_approach_clearance=280.0,
         w_approach_collision=900.0,
-        approach_fraction=0.25,
-        w_via_dev=0.4,
         w_yaw_dev=0.08,
-        w_yaw_monotonic=150.0,
-        yaw_goal_reach_u=0.5,
         w_yaw_schedule=35.0,
-        init_offset_scale=0.7,
-        method="Powell",
         options={"maxiter": 80, "xtol": 3e-3, "ftol": 3e-3},
     )
 
     S, vias_opt, info = optimize_bspline_path(
-        scene,
-        start,
-        goal,
-        n_vias=n_vias,
-        moving_block_size=moving_block_size,
-        safety_margin=0.0,
-        preferred_safety_margin=0.03,
-        relax_preferred_final_fraction=0.25,
-        approach_only_clearance=0.025,
-        contact_window_fraction=0.08,
+        **common_opt,
         n_samples_curve=101,
         collision_check_subsample=1,
-        start_yaw_deg=start_yaw_deg,
-        goal_yaw_deg=goal_yaw_deg,
-        n_yaw_vias=n_vias,
-        combined_4d=True,
-        w_len=1.0,
         w_curv=0.25,
         w_yaw_smooth=0.008,
         w_safe=380.0,
         w_safe_preferred=40.0,
         w_approach_rebound=280.0,
         w_goal_clearance=35.0,
-        goal_clearance_target=0.0,
         w_goal_clearance_target=260.0,
         w_approach_clearance=420.0,
         w_approach_collision=1400.0,
-        approach_fraction=0.25,
-        w_via_dev=0.4,
         w_yaw_dev=0.10,
-        w_yaw_monotonic=150.0,
-        yaw_goal_reach_u=0.5,
         w_yaw_schedule=55.0,
         init_vias=vias1,
         init_yaw_vias_deg=np.asarray(info1["yaw_ctrl_deg"], dtype=float)[1:-1],
-        init_offset_scale=0.7,
-        method="Powell",
         options={"maxiter": 120, "xtol": 1e-3, "ftol": 1e-3},
     )
     opt_duration = time.time() - t_start
@@ -244,32 +226,6 @@ def main():
         f"required_clearance: {info['required_clearance']:+.4f} m, "
         f"preferred_clearance: {info['preferred_clearance']:+.4f} m"
     )
-
-    # SDF slice demo
-    # z_slice = 0.10
-    # xs = np.linspace(-2, 2, 120)
-    # ys = np.linspace(-2, 2, 120)
-    # sdf_slice = np.zeros((len(xs), len(ys)))
-    # for i, x in enumerate(xs):
-    #     for j, y in enumerate(ys):
-    #         sdf_slice[i, j] = scene.signed_distance(np.array([x, y, z_slice], dtype=float))
-
-    # plt.figure()
-    # plt.imshow(
-    #     sdf_slice.T,
-    #     origin="lower",
-    #     extent=(xs[0], xs[-1], ys[0], ys[-1]),
-    #     cmap="RdBu",
-    #     vmin=-0,
-    #     vmax=1,
-    #     aspect="equal",
-    # )
-    # plt.colorbar(label="Signed distance (m)")
-    # plt.title(f"SDF slice at z={z_slice:.2f} m")
-    # plt.xlabel("X (m)")
-    # plt.ylabel("Y (m)")
-    # plt.tight_layout()
-    # plt.show()
 
 
 if __name__ == "__main__":
