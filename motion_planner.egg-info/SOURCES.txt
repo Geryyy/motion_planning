@@ -3,6 +3,7 @@ geom/__init__.py
 geom/blocks.py
 geom/planning.py
 geom/scene.py
+geom/spline_opt.py
 geom/utils.py
 geom/vis.py
 motion_planner.egg-info/PKG-INFO

@@ -106,6 +106,46 @@ def yaw_smoothness_cost(yaw_deg_samples: np.ndarray) -> float:
     return float(np.sum(D2 * D2))
 
 
+def _normalize(v: np.ndarray, eps: float = 1e-12) -> np.ndarray:
+    arr = np.asarray(v, dtype=float).reshape(-1)
+    n = float(np.linalg.norm(arr))
+    if n < eps:
+        return np.zeros_like(arr)
+    return arr / n
+
+
+def _goal_approach_alignment_cost(
+    P: np.ndarray,
+    goal_normals: np.ndarray,
+    terminal_fraction: float = 0.1,
+) -> float:
+    """Penalize final approach direction that is not toward any desired goal normal."""
+    if P.shape[0] < 3 or goal_normals.size == 0:
+        return 0.0
+    tail_n = max(3, int(np.ceil(float(terminal_fraction) * P.shape[0])))
+    P_tail = P[-tail_n:]
+    seg = np.diff(P_tail, axis=0)
+    if seg.shape[0] == 0:
+        return 0.0
+    v = _normalize(np.sum(seg, axis=0))
+    if not np.any(v):
+        return 0.0
+
+    N = np.asarray(goal_normals, dtype=float).reshape(-1, 3)
+    best_cos = -1.0
+    for n in N:
+        nh = _normalize(n)
+        if not np.any(nh):
+            continue
+        # Approach direction should point against the outward surface normal.
+        c = float(np.dot(v, -nh))
+        if c > best_cos:
+            best_cos = c
+    if best_cos < -0.5:  # all normals were near-zero/invalid
+        return 0.0
+    return float((1.0 - np.clip(best_cos, -1.0, 1.0)) ** 2)
+
+
 def _path_distances(
     scene,
     P: np.ndarray,
@@ -386,6 +426,9 @@ def optimize_bspline_path(
     w_yaw_monotonic: float = 0.0,
     yaw_goal_reach_u: float = 1.0,
     w_yaw_schedule: float = 0.0,
+    goal_approach_normals: Optional[np.ndarray] = None,
+    goal_approach_window_fraction: float = 0.1,
+    w_goal_approach_normal: float = 0.0,
     init_vias: Optional[np.ndarray] = None,
     init_yaw_vias_deg: Optional[np.ndarray] = None,
     init_offset_scale: float = 1.0,
@@ -413,6 +456,8 @@ def optimize_bspline_path(
         raise ValueError("yaw_goal_reach_u must be in (0, 1].")
     if not (0.0 <= float(relax_preferred_final_fraction) < 1.0):
         raise ValueError("relax_preferred_final_fraction must be in [0, 1).")
+    if not (0.0 < float(goal_approach_window_fraction) <= 1.0):
+        raise ValueError("goal_approach_window_fraction must be in (0, 1].")
 
     if moving_block_size is None and any(float(v) > 0.0 for v in tool_half_extents):
         hx, hy, hz = map(float, tool_half_extents)
@@ -564,6 +609,11 @@ def optimize_bspline_path(
         t_sched = np.clip(us / float(yaw_goal_reach_u), 0.0, 1.0)
         yaw_sched = float(start_yaw_deg) + (float(goal_yaw_deg) - float(start_yaw_deg)) * t_sched
         j_yaw_sched = float(np.sum((yaw_samples_deg - yaw_sched) ** 2))
+        j_goal_normal = _goal_approach_alignment_cost(
+            P,
+            goal_normals=np.asarray(goal_approach_normals, dtype=float) if goal_approach_normals is not None else np.empty((0, 3), dtype=float),
+            terminal_fraction=float(goal_approach_window_fraction),
+        )
 
         j = (
             w_len * j_len
@@ -580,6 +630,7 @@ def optimize_bspline_path(
             + w_yaw_dev * j_yaw_dev
             + w_yaw_monotonic * j_yaw_mono
             + w_yaw_schedule * j_yaw_sched
+            + w_goal_approach_normal * j_goal_normal
         )
         return (
             j,
@@ -597,6 +648,7 @@ def optimize_bspline_path(
             j_yaw_dev,
             j_yaw_mono,
             j_yaw_sched,
+            j_goal_normal,
             yaw_samples_deg,
             yaw_quats,
         )
@@ -651,6 +703,7 @@ def optimize_bspline_path(
         j_yaw_dev_opt,
         j_yaw_mono_opt,
         j_yaw_sched_opt,
+        j_goal_normal_opt,
         _,
         _,
     ) = objective_single(x_opt)
@@ -681,6 +734,7 @@ def optimize_bspline_path(
         "yaw_deviation_cost": j_yaw_dev_opt,
         "yaw_monotonic_cost": j_yaw_mono_opt,
         "yaw_schedule_cost": j_yaw_sched_opt,
+        "goal_approach_normal_cost": j_goal_normal_opt,
         "min_clearance": float(np.min(d_opt)),
         "mean_clearance": float(np.mean(d_opt)),
         "turn_angle_mean_deg": mean_turn_angle_deg(P_opt),
@@ -696,6 +750,8 @@ def optimize_bspline_path(
         "goal_clearance_target": goal_clearance_target,
         "approach_only_clearance": approach_only_clearance,
         "contact_window_fraction": float(contact_window_fraction),
+        "goal_approach_window_fraction": float(goal_approach_window_fraction),
+        "goal_approach_normals": None if goal_approach_normals is None else np.asarray(goal_approach_normals, dtype=float).copy(),
         "yaw_goal_reach_u": float(yaw_goal_reach_u),
         "collision_model": "box" if moving_block_size is not None else "point",
         "nit": opt["nit"],

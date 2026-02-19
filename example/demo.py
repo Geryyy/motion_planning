@@ -1,40 +1,33 @@
+import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 import time
 from matplotlib.animation import FuncAnimation
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
-from geom import Scene, plot_scene
+from geom import plot_scene
 from geom.spline_opt import optimize_bspline_path, yaw_deg_to_quat
 from geom.utils import quat_to_rot
+from scenarios import build_scenario
 
 
 def main():
-    scene = Scene()
-    # Add base objects with explicit IDs
-    table_id = scene.add_block(size=(2.0, 2, 0.1), position=(0.0, 0.0, 0.05), quat=(0.0, 0.0, 0.0, 1.0), object_id="table")
-    scene.add_block(size=(0.1, 2, 2), position=(1, 0.0, 1), quat=(0.0, 0.0, 0.0, 1.0), object_id="wall")
-
-    # Compute a point to place a cube on top of the table, centered
-    new_size = (0.6, 0.9, 0.6)
-    pos_top = scene.get_top_point(table_id, new_size, gap=0.0, xy_offset=(0.0, -0.5))
-    scene.add_block(size=new_size, position=tuple(pos_top), quat=(0.0, 0.0, 0.0, 1.0), object_id="cube_top")
-
-    # Payload block dimensions: x=0.9, y=0.6, z=0.6 [m]
-    moving_block_size = (0.9, 0.6, 0.6)
-    start_yaw_deg = 0.0
-    goal_yaw_deg = 90.0
-
-    # Goal placement uses the payload dimensions at final yaw=90 deg.
-    moving_block_size_goal = (moving_block_size[1], moving_block_size[0], moving_block_size[2])
-    goal_t = scene.get_front_point(
-        base="cube_top",
-        new_size=moving_block_size_goal,
-        gap=0.00,
-        xz_offset=(0.0, 0.0),
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--scenario",
+        default="front",
+        choices=["front", "on_top", "between"],
+        help="Scenario name to run.",
     )
+    args = parser.parse_args()
 
-    start = (-0.4, -0.2, 1.50)
-    goal = goal_t
+    scenario = build_scenario(args.scenario)
+    scene = scenario.scene
+    start = scenario.start
+    goal = scenario.goal
+    moving_block_size = scenario.moving_block_size
+    start_yaw_deg = scenario.start_yaw_deg
+    goal_yaw_deg = scenario.goal_yaw_deg
+    goal_normals = np.asarray(scenario.goal_normals, dtype=float)
 
     n_vias = 2
     common_opt = dict(
@@ -52,11 +45,12 @@ def main():
         goal_yaw_deg=goal_yaw_deg,
         n_yaw_vias=n_vias,
         combined_4d=True,
-        w_len=3.5,
         approach_fraction=0.25,
         w_via_dev=0.06,
         w_yaw_monotonic=80.0,
         yaw_goal_reach_u=0.5,
+        goal_approach_normals=goal_normals,
+        goal_approach_window_fraction=0.12,
         init_offset_scale=0.7,
         method="Powell",
         goal_clearance_target=0.0,
@@ -66,6 +60,7 @@ def main():
     t_start = time.time()
     _, vias1, info1 = optimize_bspline_path(
         **common_opt,
+        w_len=3.5,
         n_samples_curve=61,
         collision_check_subsample=3,
         w_curv=0.08,
@@ -79,11 +74,13 @@ def main():
         w_approach_collision=900.0,
         w_yaw_dev=0.04,
         w_yaw_schedule=35.0,
+        w_goal_approach_normal=40.0,
         options={"maxiter": 80, "xtol": 3e-3, "ftol": 3e-3},
     )
 
     S, vias_opt, info = optimize_bspline_path(
         **common_opt,
+        w_len=5.0,
         n_samples_curve=101,
         collision_check_subsample=1,
         w_curv=0.12,
@@ -97,6 +94,7 @@ def main():
         w_approach_collision=1400.0,
         w_yaw_dev=0.05,
         w_yaw_schedule=55.0,
+        w_goal_approach_normal=80.0,
         init_vias=vias1,
         init_yaw_vias_deg=np.asarray(info1["yaw_ctrl_deg"], dtype=float)[1:-1],
         options={"maxiter": 160, "xtol": 1e-3, "ftol": 1e-3},
@@ -217,6 +215,7 @@ def main():
         f"approach_col: {info['approach_collision_cost']:.6e}, "
         f"via_dev: {info['via_deviation_cost']:.6e}, yaw_dev: {info['yaw_deviation_cost']:.6e}, "
         f"yaw_mono: {info['yaw_monotonic_cost']:.6e}, yaw_sched: {info['yaw_schedule_cost']:.6e}, "
+        f"goal_normal: {info['goal_approach_normal_cost']:.6e}, "
         f"iterations: {info['nit']}"
     )
     print(
