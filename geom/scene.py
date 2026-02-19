@@ -67,6 +67,93 @@ class Scene:
                 inside = True
         return -min_dist if inside else min_dist
 
+    def signed_distance_block(
+        self,
+        size: Tuple[float, float, float],
+        position: np.ndarray,
+        quat: Tuple[float, float, float, float] = (0.0, 0.0, 0.0, 1.0),
+        ignore_ids: Optional[List[str]] = None,
+    ) -> float:
+        """Minimum signed distance from a moving box to scene blocks.
+
+        Positive values mean separated, a small negative value means collision.
+        """
+        sx, sy, sz = map(float, size)
+        R = quat_to_rot(quat)
+        T = np.asarray(position, dtype=float).reshape(3)
+        moving = fcl.CollisionObject(fcl.Box(sx, sy, sz), fcl.Transform(R, T))
+
+        req_dist = fcl.DistanceRequest(enable_nearest_points=False)
+        req_col = fcl.CollisionRequest(num_max_contacts=8, enable_contact=True)
+        ignore = set(ignore_ids or [])
+
+        min_dist = np.inf
+        in_collision = False
+        max_penetration = 0.0
+        for b in self.blocks:
+            if b.object_id is not None and b.object_id in ignore:
+                continue
+
+            static_obj = b.fcl_object()
+            res_dist = fcl.DistanceResult()
+            d = fcl.distance(moving, static_obj, req_dist, res_dist)
+            if d < min_dist:
+                min_dist = d
+
+            res_col = fcl.CollisionResult()
+            if fcl.collide(moving, static_obj, req_col, res_col) > 0:
+                in_collision = True
+                contacts = getattr(res_col, "contacts", []) or []
+                for c in contacts:
+                    pen = float(getattr(c, "penetration_depth", 0.0) or 0.0)
+                    if pen > max_penetration:
+                        max_penetration = pen
+
+        if not np.isfinite(min_dist):
+            return np.inf
+        if not in_collision:
+            return float(min_dist)
+        if max_penetration > 0.0:
+            return -max_penetration
+
+        # Fallback when penetration depth is unavailable: sample box points against point-SDF.
+        sample_pts = self._sample_box_points(size=size, position=T, quat=quat)
+        point_sdf = np.array([self.signed_distance(p) for p in sample_pts], dtype=float)
+        return float(np.min(point_sdf))
+
+    def _sample_box_points(
+        self,
+        size: Tuple[float, float, float],
+        position: np.ndarray,
+        quat: Tuple[float, float, float, float],
+    ) -> np.ndarray:
+        """Sample center, face-centers and corners of the oriented box."""
+        sx, sy, sz = map(float, size)
+        hx, hy, hz = 0.5 * sx, 0.5 * sy, 0.5 * sz
+        local_pts = np.array(
+            [
+                [0.0, 0.0, 0.0],
+                [hx, 0.0, 0.0],
+                [-hx, 0.0, 0.0],
+                [0.0, hy, 0.0],
+                [0.0, -hy, 0.0],
+                [0.0, 0.0, hz],
+                [0.0, 0.0, -hz],
+                [hx, hy, hz],
+                [hx, hy, -hz],
+                [hx, -hy, hz],
+                [hx, -hy, -hz],
+                [-hx, hy, hz],
+                [-hx, hy, -hz],
+                [-hx, -hy, hz],
+                [-hx, -hy, -hz],
+            ],
+            dtype=float,
+        )
+        R = quat_to_rot(quat)
+        T = np.asarray(position, dtype=float).reshape(3)
+        return (R @ local_pts.T).T + T
+
     def sample_sdf_grid(self, bounds: Tuple[Tuple[float, float], Tuple[float, float], Tuple[float, float]],
                         dims: Tuple[int, int, int]):
         """Sample SDF on a regular grid over bounds with shape dims."""
