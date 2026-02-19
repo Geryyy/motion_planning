@@ -6,4 +6,4 @@ build-backend = "setuptools.build_meta"
 name = "motion-planner"
 version = "0.0.1"
 requires-python = ">=3.8"
-dependencies = ["numpy", "matplotlib", "python-fcl", "scipy"]
+dependencies = ["numpy", "matplotlib", "python-fcl", "scipy", "PyYAML"]

@@ -1,0 +1,79 @@
+defaults:
+  base_size: [0.6, 0.9, 0.6]
+
+scenarios:
+  front:
+    blocks:
+      - id: table
+        size: [2.0, 2.0, 0.1]
+        position: [0.0, 0.0, 0.05]
+      - id: wall
+        size: [0.1, 2.0, 2.0]
+        position: [1.0, 0.0, 1.0]
+      - id: cube_top
+        position: [0.0, -0.5, 0.4]
+    moving_block:
+      start: [-0.4, -0.2, 1.5]
+      start_yaw_deg: 0.0
+      goal_yaw_deg: 90.0
+      goal:
+        type: face
+        base: cube_top
+        face: front
+        gap: 0.0
+        tangential_offset: [0.0, 0.0]
+        size: [0.9, 0.6, 0.6]
+      normal_query:
+        search_radius: 0.2
+        tangential_margin: 0.04
+        max_normals: 4
+
+  on_top:
+    blocks:
+      - id: table
+        size: [2.0, 2.0, 0.1]
+        position: [0.0, 0.0, 0.05]
+      - id: wall
+        size: [0.1, 2.0, 2.0]
+        position: [1.0, 0.0, 1.0]
+      - id: base_block
+        position: [0.05, -0.2, 0.35]
+    moving_block:
+      start: [-0.9, 0.6, 1.35]
+      start_yaw_deg: 10.0
+      goal_yaw_deg: 0.0
+      goal:
+        type: face
+        base: base_block
+        face: top
+        gap: 0.0
+        tangential_offset: [0.0, 0.0]
+      normal_query:
+        search_radius: 0.2
+        tangential_margin: 0.04
+        max_normals: 3
+
+  between:
+    blocks:
+      - id: table
+        size: [2.0, 2.0, 0.1]
+        position: [0.0, 0.0, 0.05]
+      - id: wall
+        size: [0.1, 2.0, 2.0]
+        position: [1.0, 0.0, 1.0]
+      - id: left_block
+        position: [-0.6, 0.0, 0.35]
+      - id: right_block
+        position: [0.6, 0.0, 0.35]
+    moving_block:
+      start: [-2.0, 0.0, 1.5]
+      start_yaw_deg: -15.0
+      goal_yaw_deg: 0.0
+      goal:
+        type: between
+        ids: [left_block, right_block]
+        position: [null, null, 0.35]
+      normal_query:
+        search_radius: 0.25
+        tangential_margin: 0.05
+        max_normals: 4

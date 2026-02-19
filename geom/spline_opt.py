@@ -119,7 +119,7 @@ def _goal_approach_alignment_cost(
     goal_normals: np.ndarray,
     terminal_fraction: float = 0.1,
 ) -> float:
-    """Penalize final approach direction that is not toward any desired goal normal."""
+    """Penalize final approach direction that is not aligned with -summed goal normals."""
     if P.shape[0] < 3 or goal_normals.size == 0:
         return 0.0
     tail_n = max(3, int(np.ceil(float(terminal_fraction) * P.shape[0])))
@@ -132,18 +132,17 @@ def _goal_approach_alignment_cost(
         return 0.0
 
     N = np.asarray(goal_normals, dtype=float).reshape(-1, 3)
-    best_cos = -1.0
-    for n in N:
-        nh = _normalize(n)
-        if not np.any(nh):
-            continue
-        # Approach direction should point against the outward surface normal.
-        c = float(np.dot(v, -nh))
-        if c > best_cos:
-            best_cos = c
-    if best_cos < -0.5:  # all normals were near-zero/invalid
+    Nn = np.array([_normalize(n) for n in N], dtype=float)
+    if Nn.size == 0:
         return 0.0
-    return float((1.0 - np.clip(best_cos, -1.0, 1.0)) ** 2)
+    s = _normalize(np.sum(Nn, axis=0))
+    if not np.any(s):
+        s = _normalize(Nn[0])
+    if not np.any(s):
+        return 0.0
+    # Approach should move opposite to resultant outward surface normal.
+    c = float(np.dot(v, -s))
+    return float((1.0 - np.clip(c, -1.0, 1.0)) ** 2)
 
 
 def _path_distances(

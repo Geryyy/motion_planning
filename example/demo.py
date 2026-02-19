@@ -1,4 +1,5 @@
 import argparse
+from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
 import time
@@ -7,7 +8,92 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from geom import plot_scene
 from geom.spline_opt import optimize_bspline_path, yaw_deg_to_quat
 from geom.utils import quat_to_rot
-from scenarios import build_scenario
+from scenarios import build_scenario, list_scenarios
+
+
+DEMO_CONFIG = {
+    "planner_common": {
+        "n_vias": 2,
+        "safety_margin": 0.0,
+        "preferred_safety_margin": 0.02,
+        "relax_preferred_final_fraction": 0.25,
+        "approach_only_clearance": 0.015,
+        "contact_window_fraction": 0.08,
+        "n_yaw_vias": 2,
+        "combined_4d": True,
+        "approach_fraction": 0.25,
+        "w_via_dev": 0.06,
+        "w_yaw_monotonic": 80.0,
+        "yaw_goal_reach_u": 0.5,
+        "goal_approach_window_fraction": 0.12,
+        "init_offset_scale": 0.7,
+        "method": "Powell",
+        "goal_clearance_target": 0.0,
+    },
+    "stage1": {
+        "w_len": 3.5,
+        "n_samples_curve": 61,
+        "collision_check_subsample": 3,
+        "w_curv": 0.08,
+        "w_yaw_smooth": 0.006,
+        "w_safe": 300.0,
+        "w_safe_preferred": 18.0,
+        "w_approach_rebound": 180.0,
+        "w_goal_clearance": 20.0,
+        "w_goal_clearance_target": 120.0,
+        "w_approach_clearance": 280.0,
+        "w_approach_collision": 900.0,
+        "w_yaw_dev": 0.04,
+        "w_yaw_schedule": 35.0,
+        "w_goal_approach_normal": 40.0,
+        "options": {"maxiter": 80, "xtol": 3e-3, "ftol": 3e-3},
+    },
+    "stage2": {
+        "w_len": 5.0,
+        "n_samples_curve": 101,
+        "collision_check_subsample": 1,
+        "w_curv": 0.12,
+        "w_yaw_smooth": 0.008,
+        "w_safe": 380.0,
+        "w_safe_preferred": 24.0,
+        "w_approach_rebound": 280.0,
+        "w_goal_clearance": 35.0,
+        "w_goal_clearance_target": 260.0,
+        "w_approach_clearance": 420.0,
+        "w_approach_collision": 1400.0,
+        "w_yaw_dev": 0.05,
+        "w_yaw_schedule": 55.0,
+        "w_goal_approach_normal": 80.0,
+        "options": {"maxiter": 160, "xtol": 1e-3, "ftol": 1e-3},
+    },
+}
+
+
+def _normalize(v: np.ndarray, eps: float = 1e-12) -> np.ndarray:
+    arr = np.asarray(v, dtype=float).reshape(-1)
+    n = float(np.linalg.norm(arr))
+    if n < eps:
+        return np.zeros_like(arr)
+    return arr / n
+
+
+def _approach_alignment_vectors(
+    curve: np.ndarray,
+    goal_normals: np.ndarray,
+    terminal_fraction: float,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    tail_n = max(3, int(np.ceil(float(terminal_fraction) * curve.shape[0])))
+    v_approach = _normalize(np.sum(np.diff(curve[-tail_n:], axis=0), axis=0))
+
+    normals = np.asarray(goal_normals, dtype=float).reshape(-1, 3)
+    if normals.size == 0:
+        summed_normal = np.array([0.0, 0.0, 1.0], dtype=float)
+    else:
+        summed_normal = _normalize(np.sum(normals, axis=0))
+        if not np.any(summed_normal):
+            summed_normal = _normalize(normals[0])
+    desired_approach = -summed_normal
+    return v_approach, summed_normal, desired_approach
 
 
 def main():
@@ -15,12 +101,20 @@ def main():
     parser.add_argument(
         "--scenario",
         default="front",
-        choices=["front", "on_top", "between"],
         help="Scenario name to run.",
     )
+    parser.add_argument(
+        "--scenarios-file",
+        default=str(Path(__file__).with_name("scenarios.yaml")),
+        help="Path to scenarios YAML file.",
+    )
     args = parser.parse_args()
+    scenario_names = list_scenarios(args.scenarios_file)
+    if args.scenario not in scenario_names:
+        available = ", ".join(scenario_names)
+        raise ValueError(f"Unknown scenario '{args.scenario}'. Available: {available}")
 
-    scenario = build_scenario(args.scenario)
+    scenario = build_scenario(args.scenario, scenarios_file=args.scenarios_file)
     scene = scenario.scene
     start = scenario.start
     goal = scenario.goal
@@ -29,75 +123,47 @@ def main():
     goal_yaw_deg = scenario.goal_yaw_deg
     goal_normals = np.asarray(scenario.goal_normals, dtype=float)
 
-    n_vias = 2
+    planner_cfg = DEMO_CONFIG["planner_common"]
     common_opt = dict(
         scene=scene,
         start=start,
         goal=goal,
-        n_vias=n_vias,
+        n_vias=planner_cfg["n_vias"],
         moving_block_size=moving_block_size,
-        safety_margin=0.0,
-        preferred_safety_margin=0.02,
-        relax_preferred_final_fraction=0.25,
-        approach_only_clearance=0.015,
-        contact_window_fraction=0.08,
+        safety_margin=planner_cfg["safety_margin"],
+        preferred_safety_margin=planner_cfg["preferred_safety_margin"],
+        relax_preferred_final_fraction=planner_cfg["relax_preferred_final_fraction"],
+        approach_only_clearance=planner_cfg["approach_only_clearance"],
+        contact_window_fraction=planner_cfg["contact_window_fraction"],
         start_yaw_deg=start_yaw_deg,
         goal_yaw_deg=goal_yaw_deg,
-        n_yaw_vias=n_vias,
-        combined_4d=True,
-        approach_fraction=0.25,
-        w_via_dev=0.06,
-        w_yaw_monotonic=80.0,
-        yaw_goal_reach_u=0.5,
+        n_yaw_vias=planner_cfg["n_yaw_vias"],
+        combined_4d=planner_cfg["combined_4d"],
+        approach_fraction=planner_cfg["approach_fraction"],
+        w_via_dev=planner_cfg["w_via_dev"],
+        w_yaw_monotonic=planner_cfg["w_yaw_monotonic"],
+        yaw_goal_reach_u=planner_cfg["yaw_goal_reach_u"],
         goal_approach_normals=goal_normals,
-        goal_approach_window_fraction=0.12,
-        init_offset_scale=0.7,
-        method="Powell",
-        goal_clearance_target=0.0,
+        goal_approach_window_fraction=planner_cfg["goal_approach_window_fraction"],
+        init_offset_scale=planner_cfg["init_offset_scale"],
+        method=planner_cfg["method"],
+        goal_clearance_target=planner_cfg["goal_clearance_target"],
     )
 
     # Two-stage optimization: fast coarse solve, then warm-started refine.
     t_start = time.time()
+    stage1_cfg = DEMO_CONFIG["stage1"]
     _, vias1, info1 = optimize_bspline_path(
         **common_opt,
-        w_len=3.5,
-        n_samples_curve=61,
-        collision_check_subsample=3,
-        w_curv=0.08,
-        w_yaw_smooth=0.006,
-        w_safe=300.0,
-        w_safe_preferred=18.0,
-        w_approach_rebound=180.0,
-        w_goal_clearance=20.0,
-        w_goal_clearance_target=120.0,
-        w_approach_clearance=280.0,
-        w_approach_collision=900.0,
-        w_yaw_dev=0.04,
-        w_yaw_schedule=35.0,
-        w_goal_approach_normal=40.0,
-        options={"maxiter": 80, "xtol": 3e-3, "ftol": 3e-3},
+        **stage1_cfg,
     )
 
+    stage2_cfg = DEMO_CONFIG["stage2"]
     S, vias_opt, info = optimize_bspline_path(
         **common_opt,
-        w_len=5.0,
-        n_samples_curve=101,
-        collision_check_subsample=1,
-        w_curv=0.12,
-        w_yaw_smooth=0.008,
-        w_safe=380.0,
-        w_safe_preferred=24.0,
-        w_approach_rebound=280.0,
-        w_goal_clearance=35.0,
-        w_goal_clearance_target=260.0,
-        w_approach_clearance=420.0,
-        w_approach_collision=1400.0,
-        w_yaw_dev=0.05,
-        w_yaw_schedule=55.0,
-        w_goal_approach_normal=80.0,
+        **stage2_cfg,
         init_vias=vias1,
         init_yaw_vias_deg=np.asarray(info1["yaw_ctrl_deg"], dtype=float)[1:-1],
-        options={"maxiter": 160, "xtol": 1e-3, "ftol": 1e-3},
     )
     opt_duration = time.time() - t_start
     print(f"Two-stage optimization took {opt_duration:.2f} seconds")
@@ -105,6 +171,17 @@ def main():
     # Sample and plot
     u = np.linspace(0, 1, 250)
     curve = S(u)
+    v_approach, summed_normal, desired_approach = _approach_alignment_vectors(
+        curve=curve,
+        goal_normals=goal_normals,
+        terminal_fraction=DEMO_CONFIG["planner_common"]["goal_approach_window_fraction"],
+    )
+    align_cos = float(np.clip(np.dot(v_approach, desired_approach), -1.0, 1.0))
+    align_angle_deg = float(np.degrees(np.arccos(align_cos)))
+    print(
+        f"Approach alignment angle: {align_angle_deg:.2f} deg "
+        f"(0 deg means perfectly aligned with -summed surface normals)"
+    )
 
     fig = plt.figure(figsize=(13, 5.5))
     ax = fig.add_subplot(1, 2, 1, projection="3d")
@@ -113,6 +190,26 @@ def main():
 
     for i, vp in enumerate(vias_opt):
         ax.scatter(*vp, s=30, label=f"v{i + 1} (opt)")
+
+    normal_len = 0.35 * max(float(np.linalg.norm(np.asarray(moving_block_size, dtype=float))), 1e-6)
+    g = np.asarray(goal, dtype=float)
+    for n in goal_normals:
+        nn = _normalize(np.asarray(n, dtype=float))
+        ax.quiver(g[0], g[1], g[2], nn[0], nn[1], nn[2], length=normal_len, color="deepskyblue", linewidth=2.0)
+    ax.quiver(
+        g[0], g[1], g[2],
+        summed_normal[0], summed_normal[1], summed_normal[2],
+        length=normal_len, color="magenta", linewidth=2.5,
+    )
+    ax.quiver(
+        g[0], g[1], g[2],
+        v_approach[0], v_approach[1], v_approach[2],
+        length=normal_len, color="red", linewidth=2.5,
+    )
+    # Proxy handles so quiver arrows appear in legend.
+    ax.plot([], [], [], color="deepskyblue", lw=2, label="surface normals @ goal")
+    ax.plot([], [], [], color="magenta", lw=2, label="resultant normal (sum normals)")
+    ax.plot([], [], [], color="red", lw=2, label="actual approach direction")
 
     # Animate moving payload block along the spline and color by clearance.
     def _box_vertices(center, size, yaw_deg):
