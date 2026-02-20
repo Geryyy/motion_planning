@@ -72,6 +72,32 @@ def _goal_from_face(base_center: Vec3, base_size: Vec3, moving_size: Vec3, face:
     raise ValueError(f"Unsupported face '{face}'")
 
 
+def _resolve_goal(cfg: Dict, goal_cfg: Dict, block_centers: Dict[str, Vec3], block_sizes: Dict[str, Vec3], move_size: Vec3) -> Vec3:
+    gtype = str(goal_cfg.get("type", "face")).lower()
+    if gtype == "face":
+        base_id = str(goal_cfg["base"])
+        return _goal_from_face(
+            base_center=block_centers[base_id],
+            base_size=block_sizes[base_id],
+            moving_size=move_size,
+            face=str(goal_cfg["face"]),
+        )
+    if gtype == "between":
+        ids = goal_cfg["ids"]
+        p0 = np.asarray(block_centers[str(ids[0])], dtype=float)
+        p1 = np.asarray(block_centers[str(ids[1])], dtype=float)
+        mid = 0.5 * (p0 + p1)
+        if "position" in goal_cfg:
+            pos = goal_cfg["position"]
+            out = [float(mid[i]) if pos[i] is None else float(pos[i]) for i in range(3)]
+            return (out[0], out[1], out[2])
+        return (float(mid[0]), float(mid[1]), float(mid[2]))
+    if gtype == "point":
+        p = goal_cfg["position"]
+        return (float(p[0]), float(p[1]), float(p[2]))
+    raise ValueError(f"{cfg}: unsupported goal.type '{gtype}'")
+
+
 def _parse_yaml(path: Path) -> Dict:
     with path.open("r", encoding="utf-8") as fh:
         data = yaml.safe_load(fh)
@@ -122,16 +148,7 @@ def _draw_scenario(ax, name: str, cfg: Dict) -> None:
     move_size = tuple(float(v) for v in moving.get("size", [0.9, 0.6, 0.6]))
     start = tuple(float(v) for v in moving["start"])
     goal_cfg = moving["goal"]
-
-    if str(goal_cfg.get("type", "")).lower() != "face":
-        raise ValueError(f"{name}: only goal.type=face is supported in this visualizer")
-    base_id = str(goal_cfg["base"])
-    goal = _goal_from_face(
-        base_center=block_centers[base_id],
-        base_size=block_sizes[base_id],
-        moving_size=move_size,
-        face=str(goal_cfg["face"]),
-    )
+    goal = _resolve_goal(name, goal_cfg, block_centers, block_sizes, move_size)
 
     start_verts = _box_vertices(start, move_size)
     goal_verts = _box_vertices(goal, move_size)
