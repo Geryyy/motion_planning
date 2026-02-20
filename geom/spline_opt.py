@@ -428,8 +428,6 @@ def optimize_bspline_path(
     goal_approach_normals: Optional[np.ndarray] = None,
     goal_approach_window_fraction: float = 0.1,
     w_goal_approach_normal: float = 0.0,
-    init_vias: Optional[np.ndarray] = None,
-    init_yaw_vias_deg: Optional[np.ndarray] = None,
     init_offset_scale: float = 1.0,
     method: str = "Powell",
     options: Optional[Dict] = None,
@@ -466,11 +464,6 @@ def optimize_bspline_path(
     preferred_clearance = float(preferred_safety_margin) if preferred_safety_margin is not None else required_clearance
     preferred_clearance = max(preferred_clearance, required_clearance)
     via_init = _default_via_initialization(start, goal, n_vias)
-    if init_vias is not None:
-        init_v = np.asarray(init_vias, dtype=float).reshape(-1, 3)
-        if init_v.shape != (n_vias, 3):
-            raise ValueError(f"init_vias must have shape ({n_vias}, 3)")
-        via_init = init_v
     x0_pos = via_init.reshape(-1)
     yaw_via_count = n_vias if combined_4d else n_yaw_vias
     has_yaw_opt = bool(yaw_via_count > 0)
@@ -483,11 +476,6 @@ def optimize_bspline_path(
             yaw_via_count + 2,
             dtype=float,
         )[1:-1]
-        if init_yaw_vias_deg is not None:
-            init_yaw = np.asarray(init_yaw_vias_deg, dtype=float).reshape(-1)
-            if init_yaw.shape != (yaw_via_count,):
-                raise ValueError(f"init_yaw_vias_deg must have shape ({yaw_via_count},)")
-            yaw_via_init = init_yaw
         x0 = np.hstack([x0_pos, yaw_via_init])
     else:
         yaw_ctrl_ref = np.array([float(start_yaw_deg), float(goal_yaw_deg)], dtype=float)

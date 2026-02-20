@@ -1,0 +1,582 @@
+defaults:
+  base_size:
+    - 0.9
+    - 0.6
+    - 0.6
+scenarios:
+  n1_front:
+    blocks:
+      -
+        id: table
+        size:
+          - 4.0
+          - 4.0
+          - 0.1
+        position:
+          - 0.0
+          - 0.0
+          - 0.05
+      -
+        id: block_1
+        size:
+          - 0.9
+          - 0.6
+          - 0.6
+        position:
+          - -0.8
+          - -0.4
+          - 0.4
+    moving_block:
+      size:
+        - 0.9
+        - 0.6
+        - 0.6
+      start:
+        - 1.3
+        - -0.05
+        - 1.25
+      start_yaw_deg: 0.0
+      goal_yaw_deg: 0.0
+      goal:
+        type: face
+        base: block_1
+        face: front
+        gap: 0.0
+        tangential_offset:
+          - 0.0
+          - 0.0
+        size:
+          - 0.9
+          - 0.6
+          - 0.6
+      goal_normals:
+        -
+          - 1.0
+          - 0.0
+          - 0.0
+      approach_direction:
+        - -1.0
+        - 0.0
+        - 0.0
+  n1_top:
+    blocks:
+      -
+        id: table
+        size:
+          - 4.0
+          - 4.0
+          - 0.1
+        position:
+          - 0.0
+          - 0.0
+          - 0.05
+      -
+        id: block_1
+        size:
+          - 0.9
+          - 0.6
+          - 0.6
+        position:
+          - -0.8
+          - -0.4
+          - 0.4
+    moving_block:
+      size:
+        - 0.9
+        - 0.6
+        - 0.6
+      start:
+        - -0.8
+        - -0.05
+        - 1.85
+      start_yaw_deg: 0.0
+      goal_yaw_deg: 0.0
+      goal:
+        type: face
+        base: block_1
+        face: top
+        gap: 0.0
+        tangential_offset:
+          - 0.0
+          - 0.0
+        size:
+          - 0.9
+          - 0.6
+          - 0.6
+      goal_normals:
+        -
+          - 0.0
+          - 0.0
+          - 1.0
+      approach_direction:
+        - 0.0
+        - 0.0
+        - -1.0
+  n1_back:
+    blocks:
+      -
+        id: table
+        size:
+          - 4.0
+          - 4.0
+          - 0.1
+        position:
+          - 0.0
+          - 0.0
+          - 0.05
+      -
+        id: block_1
+        size:
+          - 0.9
+          - 0.6
+          - 0.6
+        position:
+          - -0.8
+          - -0.4
+          - 0.4
+    moving_block:
+      size:
+        - 0.9
+        - 0.6
+        - 0.6
+      start:
+        - -2.9
+        - -0.05
+        - 1.25
+      start_yaw_deg: 0.0
+      goal_yaw_deg: 0.0
+      goal:
+        type: face
+        base: block_1
+        face: back
+        gap: 0.0
+        tangential_offset:
+          - 0.0
+          - 0.0
+        size:
+          - 0.9
+          - 0.6
+          - 0.6
+      goal_normals:
+        -
+          - -1.0
+          - 0.0
+          - 0.0
+      approach_direction:
+        - 1.0
+        - 0.0
+        - 0.0
+  n2_front:
+    blocks:
+      -
+        id: table
+        size:
+          - 4.0
+          - 4.0
+          - 0.1
+        position:
+          - 0.0
+          - 0.0
+          - 0.05
+      -
+        id: block_1
+        size:
+          - 0.9
+          - 0.6
+          - 0.6
+        position:
+          - -0.8
+          - -0.4
+          - 0.4
+      -
+        id: block_2
+        size:
+          - 0.9
+          - 0.6
+          - 0.6
+        position:
+          - 0.0
+          - 0.45
+          - 0.4
+    moving_block:
+      size:
+        - 0.9
+        - 0.6
+        - 0.6
+      start:
+        - 1.3
+        - -0.05
+        - 1.25
+      start_yaw_deg: 0.0
+      goal_yaw_deg: 0.0
+      goal:
+        type: face
+        base: block_1
+        face: front
+        gap: 0.0
+        tangential_offset:
+          - 0.0
+          - 0.0
+        size:
+          - 0.9
+          - 0.6
+          - 0.6
+      goal_normals:
+        -
+          - 1.0
+          - 0.0
+          - 0.0
+      approach_direction:
+        - -1.0
+        - 0.0
+        - 0.0
+  n2_top:
+    blocks:
+      -
+        id: table
+        size:
+          - 4.0
+          - 4.0
+          - 0.1
+        position:
+          - 0.0
+          - 0.0
+          - 0.05
+      -
+        id: block_1
+        size:
+          - 0.9
+          - 0.6
+          - 0.6
+        position:
+          - -0.8
+          - -0.4
+          - 0.4
+      -
+        id: block_2
+        size:
+          - 0.9
+          - 0.6
+          - 0.6
+        position:
+          - 0.0
+          - 0.45
+          - 0.4
+    moving_block:
+      size:
+        - 0.9
+        - 0.6
+        - 0.6
+      start:
+        - -0.8
+        - -0.05
+        - 1.85
+      start_yaw_deg: 0.0
+      goal_yaw_deg: 0.0
+      goal:
+        type: face
+        base: block_1
+        face: top
+        gap: 0.0
+        tangential_offset:
+          - 0.0
+          - 0.0
+        size:
+          - 0.9
+          - 0.6
+          - 0.6
+      goal_normals:
+        -
+          - 0.0
+          - 0.0
+          - 1.0
+      approach_direction:
+        - 0.0
+        - 0.0
+        - -1.0
+  n2_back:
+    blocks:
+      -
+        id: table
+        size:
+          - 4.0
+          - 4.0
+          - 0.1
+        position:
+          - 0.0
+          - 0.0
+          - 0.05
+      -
+        id: block_1
+        size:
+          - 0.9
+          - 0.6
+          - 0.6
+        position:
+          - -0.8
+          - -0.4
+          - 0.4
+      -
+        id: block_2
+        size:
+          - 0.9
+          - 0.6
+          - 0.6
+        position:
+          - 0.0
+          - 0.45
+          - 0.4
+    moving_block:
+      size:
+        - 0.9
+        - 0.6
+        - 0.6
+      start:
+        - -2.9
+        - -0.05
+        - 1.25
+      start_yaw_deg: 0.0
+      goal_yaw_deg: 0.0
+      goal:
+        type: face
+        base: block_1
+        face: back
+        gap: 0.0
+        tangential_offset:
+          - 0.0
+          - 0.0
+        size:
+          - 0.9
+          - 0.6
+          - 0.6
+      goal_normals:
+        -
+          - -1.0
+          - 0.0
+          - 0.0
+      approach_direction:
+        - 1.0
+        - 0.0
+        - 0.0
+  n3_front:
+    blocks:
+      -
+        id: table
+        size:
+          - 4.0
+          - 4.0
+          - 0.1
+        position:
+          - 0.0
+          - 0.0
+          - 0.05
+      -
+        id: block_1
+        size:
+          - 0.9
+          - 0.6
+          - 0.6
+        position:
+          - -0.8
+          - -0.4
+          - 0.4
+      -
+        id: block_2
+        size:
+          - 0.9
+          - 0.6
+          - 0.6
+        position:
+          - 0.0
+          - 0.45
+          - 0.4
+      -
+        id: block_3
+        size:
+          - 0.9
+          - 0.6
+          - 0.6
+        position:
+          - 0.8
+          - -0.2
+          - 0.4
+    moving_block:
+      size:
+        - 0.9
+        - 0.6
+        - 0.6
+      start:
+        - 1.3
+        - -0.05
+        - 1.25
+      start_yaw_deg: 0.0
+      goal_yaw_deg: 0.0
+      goal:
+        type: face
+        base: block_1
+        face: front
+        gap: 0.0
+        tangential_offset:
+          - 0.0
+          - 0.0
+        size:
+          - 0.9
+          - 0.6
+          - 0.6
+      goal_normals:
+        -
+          - 1.0
+          - 0.0
+          - 0.0
+      approach_direction:
+        - -1.0
+        - 0.0
+        - 0.0
+  n3_top:
+    blocks:
+      -
+        id: table
+        size:
+          - 4.0
+          - 4.0
+          - 0.1
+        position:
+          - 0.0
+          - 0.0
+          - 0.05
+      -
+        id: block_1
+        size:
+          - 0.9
+          - 0.6
+          - 0.6
+        position:
+          - -0.8
+          - -0.4
+          - 0.4
+      -
+        id: block_2
+        size:
+          - 0.9
+          - 0.6
+          - 0.6
+        position:
+          - 0.0
+          - 0.45
+          - 0.4
+      -
+        id: block_3
+        size:
+          - 0.9
+          - 0.6
+          - 0.6
+        position:
+          - 0.8
+          - -0.2
+          - 0.4
+    moving_block:
+      size:
+        - 0.9
+        - 0.6
+        - 0.6
+      start:
+        - -0.8
+        - -0.05
+        - 1.85
+      start_yaw_deg: 0.0
+      goal_yaw_deg: 0.0
+      goal:
+        type: face
+        base: block_1
+        face: top
+        gap: 0.0
+        tangential_offset:
+          - 0.0
+          - 0.0
+        size:
+          - 0.9
+          - 0.6
+          - 0.6
+      goal_normals:
+        -
+          - 0.0
+          - 0.0
+          - 1.0
+      approach_direction:
+        - 0.0
+        - 0.0
+        - -1.0
+  n3_back:
+    blocks:
+      -
+        id: table
+        size:
+          - 4.0
+          - 4.0
+          - 0.1
+        position:
+          - 0.0
+          - 0.0
+          - 0.05
+      -
+        id: block_1
+        size:
+          - 0.9
+          - 0.6
+          - 0.6
+        position:
+          - -0.8
+          - -0.4
+          - 0.4
+      -
+        id: block_2
+        size:
+          - 0.9
+          - 0.6
+          - 0.6
+        position:
+          - 0.0
+          - 0.45
+          - 0.4
+      -
+        id: block_3
+        size:
+          - 0.9
+          - 0.6
+          - 0.6
+        position:
+          - 0.8
+          - -0.2
+          - 0.4
+    moving_block:
+      size:
+        - 0.9
+        - 0.6
+        - 0.6
+      start:
+        - -2.9
+        - -0.05
+        - 1.25
+      start_yaw_deg: 0.0
+      goal_yaw_deg: 0.0
+      goal:
+        type: face
+        base: block_1
+        face: back
+        gap: 0.0
+        tangential_offset:
+          - 0.0
+          - 0.0
+        size:
+          - 0.9
+          - 0.6
+          - 0.6
+      goal_normals:
+        -
+          - -1.0
+          - 0.0
+          - 0.0
+      approach_direction:
+        - 1.0
+        - 0.0
+        - 0.0

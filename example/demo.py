@@ -12,60 +12,38 @@ from scenarios import build_scenario, list_scenarios
 
 
 DEMO_CONFIG = {
-    "planner_common": {
-        "n_vias": 2,
-        "safety_margin": 0.0,
-        "preferred_safety_margin": 0.02,
-        "relax_preferred_final_fraction": 0.25,
-        "approach_only_clearance": 0.015,
-        "contact_window_fraction": 0.08,
-        "n_yaw_vias": 2,
-        "combined_4d": True,
-        "approach_fraction": 0.25,
-        "w_via_dev": 0.06,
-        "w_yaw_monotonic": 80.0,
-        "yaw_goal_reach_u": 0.5,
-        "goal_approach_window_fraction": 0.12,
-        "init_offset_scale": 0.7,
-        "method": "Powell",
-        "goal_clearance_target": 0.0,
-    },
-    "stage1": {
-        "w_len": 3.5,
-        "n_samples_curve": 61,
-        "collision_check_subsample": 3,
-        "w_curv": 0.08,
-        "w_yaw_smooth": 0.006,
-        "w_safe": 300.0,
-        "w_safe_preferred": 18.0,
-        "w_approach_rebound": 180.0,
-        "w_goal_clearance": 20.0,
-        "w_goal_clearance_target": 120.0,
-        "w_approach_clearance": 280.0,
-        "w_approach_collision": 900.0,
-        "w_yaw_dev": 0.04,
-        "w_yaw_schedule": 35.0,
-        "w_goal_approach_normal": 40.0,
-        "options": {"maxiter": 80, "xtol": 3e-3, "ftol": 3e-3},
-    },
-    "stage2": {
-        "w_len": 5.0,
-        "n_samples_curve": 101,
-        "collision_check_subsample": 1,
-        "w_curv": 0.12,
-        "w_yaw_smooth": 0.008,
-        "w_safe": 380.0,
-        "w_safe_preferred": 24.0,
-        "w_approach_rebound": 280.0,
-        "w_goal_clearance": 35.0,
-        "w_goal_clearance_target": 260.0,
-        "w_approach_clearance": 420.0,
-        "w_approach_collision": 1400.0,
-        "w_yaw_dev": 0.05,
-        "w_yaw_schedule": 55.0,
-        "w_goal_approach_normal": 80.0,
-        "options": {"maxiter": 160, "xtol": 1e-3, "ftol": 1e-3},
-    },
+    "n_vias": 2,
+    "safety_margin": 0.0,
+    "preferred_safety_margin": 0.02,
+    "relax_preferred_final_fraction": 0.25,
+    "approach_only_clearance": 0.015,
+    "contact_window_fraction": 0.08,
+    "n_yaw_vias": 2,
+    "combined_4d": True,
+    "approach_fraction": 0.25,
+    "w_via_dev": 0.06,
+    "w_yaw_monotonic": 80.0,
+    "yaw_goal_reach_u": 0.5,
+    "goal_approach_window_fraction": 0.12,
+    "init_offset_scale": 0.7,
+    "method": "Powell",
+    "goal_clearance_target": 0.0,
+    "w_len": 5.0,
+    "n_samples_curve": 101,
+    "collision_check_subsample": 1,
+    "w_curv": 0.12,
+    "w_yaw_smooth": 0.008,
+    "w_safe": 380.0,
+    "w_safe_preferred": 24.0,
+    "w_approach_rebound": 280.0,
+    "w_goal_clearance": 35.0,
+    "w_goal_clearance_target": 260.0,
+    "w_approach_clearance": 420.0,
+    "w_approach_collision": 1400.0,
+    "w_yaw_dev": 0.05,
+    "w_yaw_schedule": 55.0,
+    "w_goal_approach_normal": 80.0,
+    "options": {"maxiter": 160, "xtol": 1e-3, "ftol": 1e-3},
 }
 
 
@@ -123,50 +101,22 @@ def main():
     goal_yaw_deg = scenario.goal_yaw_deg
     goal_normals = np.asarray(scenario.goal_normals, dtype=float)
 
-    planner_cfg = DEMO_CONFIG["planner_common"]
-    common_opt = dict(
+    planner_cfg = DEMO_CONFIG
+
+    # Single-stage optimization.
+    t_start = time.time()
+    S, vias_opt, info = optimize_bspline_path(
         scene=scene,
         start=start,
         goal=goal,
-        n_vias=planner_cfg["n_vias"],
         moving_block_size=moving_block_size,
-        safety_margin=planner_cfg["safety_margin"],
-        preferred_safety_margin=planner_cfg["preferred_safety_margin"],
-        relax_preferred_final_fraction=planner_cfg["relax_preferred_final_fraction"],
-        approach_only_clearance=planner_cfg["approach_only_clearance"],
-        contact_window_fraction=planner_cfg["contact_window_fraction"],
         start_yaw_deg=start_yaw_deg,
         goal_yaw_deg=goal_yaw_deg,
-        n_yaw_vias=planner_cfg["n_yaw_vias"],
-        combined_4d=planner_cfg["combined_4d"],
-        approach_fraction=planner_cfg["approach_fraction"],
-        w_via_dev=planner_cfg["w_via_dev"],
-        w_yaw_monotonic=planner_cfg["w_yaw_monotonic"],
-        yaw_goal_reach_u=planner_cfg["yaw_goal_reach_u"],
         goal_approach_normals=goal_normals,
-        goal_approach_window_fraction=planner_cfg["goal_approach_window_fraction"],
-        init_offset_scale=planner_cfg["init_offset_scale"],
-        method=planner_cfg["method"],
-        goal_clearance_target=planner_cfg["goal_clearance_target"],
-    )
-
-    # Two-stage optimization: fast coarse solve, then warm-started refine.
-    t_start = time.time()
-    stage1_cfg = DEMO_CONFIG["stage1"]
-    _, vias1, info1 = optimize_bspline_path(
-        **common_opt,
-        **stage1_cfg,
-    )
-
-    stage2_cfg = DEMO_CONFIG["stage2"]
-    S, vias_opt, info = optimize_bspline_path(
-        **common_opt,
-        **stage2_cfg,
-        init_vias=vias1,
-        init_yaw_vias_deg=np.asarray(info1["yaw_ctrl_deg"], dtype=float)[1:-1],
+        **planner_cfg,
     )
     opt_duration = time.time() - t_start
-    print(f"Two-stage optimization took {opt_duration:.2f} seconds")
+    print(f"Optimization took {opt_duration:.2f} seconds")
 
     # Sample and plot
     u = np.linspace(0, 1, 250)
@@ -174,7 +124,7 @@ def main():
     v_approach, summed_normal, desired_approach = _approach_alignment_vectors(
         curve=curve,
         goal_normals=goal_normals,
-        terminal_fraction=DEMO_CONFIG["planner_common"]["goal_approach_window_fraction"],
+        terminal_fraction=DEMO_CONFIG["goal_approach_window_fraction"],
     )
     align_cos = float(np.clip(np.dot(v_approach, desired_approach), -1.0, 1.0))
     align_angle_deg = float(np.degrees(np.arccos(align_cos)))

@@ -6,7 +6,6 @@ import numpy as np
 import yaml
 
 from geom import Scene
-from geom.utils import quat_to_rot
 
 
 @dataclass(frozen=True)
@@ -52,16 +51,7 @@ class WorldModel:
         goal_yaw_deg = float(moving_cfg.get("goal_yaw_deg", 0.0))
 
         goal = _resolve_goal(scene, moving_size, moving_cfg["goal"])
-        normal_cfg = moving_cfg.get("normal_query", {})
-        goal_normals = query_goal_normals(
-            scene=scene,
-            goal=np.asarray(goal, dtype=float),
-            moving_block_size=moving_size,
-            goal_yaw_deg=goal_yaw_deg,
-            search_radius=float(normal_cfg.get("search_radius", 0.15)),
-            tangential_margin=float(normal_cfg.get("tangential_margin", 0.03)),
-            max_normals=int(normal_cfg.get("max_normals", 4)),
-        )
+        goal_normals = _parse_goal_normals(moving_cfg=moving_cfg, scenario_name=key)
 
         return ScenarioConfig(
             scene=scene,
@@ -80,95 +70,6 @@ def list_scenarios(scenarios_file: Path | str = DEFAULT_SCENARIOS_FILE) -> List[
 
 def build_scenario(name: str, scenarios_file: Path | str = DEFAULT_SCENARIOS_FILE) -> ScenarioConfig:
     return WorldModel(scenarios_file=scenarios_file).build_scenario(name)
-
-
-def query_goal_normals(
-    scene: Scene,
-    goal: np.ndarray,
-    moving_block_size: Tuple[float, float, float],
-    goal_yaw_deg: float,
-    search_radius: float = 0.15,
-    tangential_margin: float = 0.03,
-    max_normals: int = 4,
-) -> Tuple[Tuple[float, float, float], ...]:
-    """Collect outward face normals from scene faces near moving-block contact at goal."""
-    g = np.asarray(goal, dtype=float).reshape(3)
-    moving_half = 0.5 * np.asarray(moving_block_size, dtype=float)
-    R_goal = _yaw_rot(goal_yaw_deg)
-
-    def moving_support(n_world: np.ndarray) -> float:
-        n = _normalize(n_world)
-        if not np.any(n):
-            return 0.0
-        # Box support extent along world direction n.
-        return float(
-            abs(float(np.dot(n, R_goal[:, 0]))) * moving_half[0]
-            + abs(float(np.dot(n, R_goal[:, 1]))) * moving_half[1]
-            + abs(float(np.dot(n, R_goal[:, 2]))) * moving_half[2]
-        )
-
-    candidates: List[Tuple[float, np.ndarray]] = []
-    for block in scene.blocks:
-        R = quat_to_rot(block.quat)
-        c = np.asarray(block.position, dtype=float)
-        h = 0.5 * np.asarray(block.size, dtype=float)
-        p_local = R.T @ (g - c)
-
-        for axis in range(3):
-            tang = [i for i in range(3) if i != axis]
-            for sign in (-1.0, 1.0):
-                n_world = R[:, axis] * sign
-                # Only keep faces whose outward normal points toward the goal center.
-                if float(np.dot(n_world, g - c)) <= 0.0:
-                    continue
-                support_n = moving_support(n_world)
-                plane_delta = abs(p_local[axis] - sign * h[axis])
-                contact_delta = max(0.0, float(plane_delta - support_n))
-
-                inside_tangent = (
-                    abs(p_local[tang[0]]) <= h[tang[0]] + tangential_margin
-                    and abs(p_local[tang[1]]) <= h[tang[1]] + tangential_margin
-                )
-                if contact_delta <= search_radius and inside_tangent:
-                    n_oriented = _orient_toward_goal(n_world=n_world, block_center=c, goal=g)
-                    candidates.append((float(contact_delta), n_oriented))
-
-    # Fallback to closest face if query radius misses everything.
-    if not candidates:
-        best = (float("inf"), np.array([0.0, 0.0, 1.0], dtype=float))
-        for block in scene.blocks:
-            R = quat_to_rot(block.quat)
-            c = np.asarray(block.position, dtype=float)
-            h = 0.5 * np.asarray(block.size, dtype=float)
-            p_local = R.T @ (g - c)
-            for axis in range(3):
-                for sign in (-1.0, 1.0):
-                    n_world = R[:, axis] * sign
-                    if float(np.dot(n_world, g - c)) <= 0.0:
-                        continue
-                    plane_delta = abs(p_local[axis] - sign * h[axis])
-                    contact_delta = max(0.0, float(plane_delta - moving_support(n_world)))
-                    if contact_delta < best[0]:
-                        n_oriented = _orient_toward_goal(n_world=n_world, block_center=c, goal=g)
-                        best = (float(contact_delta), n_oriented)
-        candidates = [best]
-
-    candidates.sort(key=lambda item: item[0])
-    unique: List[np.ndarray] = []
-    for _, normal in candidates:
-        n = _normalize(normal)
-        if not np.any(n):
-            continue
-        is_new = all(abs(float(np.dot(n, u))) < 0.995 for u in unique)
-        if is_new:
-            unique.append(n)
-        if len(unique) >= max(1, max_normals):
-            break
-
-    if not unique:
-        unique = [np.array([0.0, 0.0, 1.0], dtype=float)]
-
-    return tuple(tuple(float(v) for v in n.tolist()) for n in unique)
 
 
 def _load_yaml_payload(path: Path) -> Dict[str, Any]:
@@ -228,34 +129,33 @@ def _resolve_goal(scene: Scene, moving_size: Tuple[float, float, float], goal_cf
     raise ValueError(f"Unknown goal type: {goal_type}")
 
 
-def _normalize(v: np.ndarray, eps: float = 1e-12) -> np.ndarray:
-    arr = np.asarray(v, dtype=float).reshape(-1)
-    n = float(np.linalg.norm(arr))
-    if n < eps:
-        return np.zeros_like(arr)
-    return arr / n
+def _parse_goal_normals(
+    moving_cfg: Dict[str, Any],
+    scenario_name: str,
+) -> Tuple[Tuple[float, float, float], ...]:
+    normals_raw = moving_cfg.get("goal_normals")
+    if normals_raw is None:
+        raise ValueError(
+            f"Scenario '{scenario_name}' is missing moving_block.goal_normals. "
+            "Provide one or more 3D vectors in YAML."
+        )
 
+    if not isinstance(normals_raw, list) or not normals_raw:
+        raise ValueError(f"Scenario '{scenario_name}' has invalid moving_block.goal_normals (must be a non-empty list).")
 
-def _yaw_rot(yaw_deg: float) -> np.ndarray:
-    y = np.deg2rad(float(yaw_deg))
-    c = float(np.cos(y))
-    s = float(np.sin(y))
-    return np.array(
-        [
-            [c, -s, 0.0],
-            [s, c, 0.0],
-            [0.0, 0.0, 1.0],
-        ],
-        dtype=float,
-    )
+    normals: List[Tuple[float, float, float]] = []
+    for idx, raw in enumerate(normals_raw):
+        if not isinstance(raw, (list, tuple)) or len(raw) != 3:
+            raise ValueError(
+                f"Scenario '{scenario_name}' goal_normals[{idx}] is invalid; expected 3 values."
+            )
 
+        vec = np.asarray([float(v) for v in raw], dtype=float)
+        mag = float(np.linalg.norm(vec))
+        if mag < 1e-12:
+            raise ValueError(f"Scenario '{scenario_name}' goal_normals[{idx}] must be non-zero.")
 
-def _orient_toward_goal(n_world: np.ndarray, block_center: np.ndarray, goal: np.ndarray) -> np.ndarray:
-    """Flip normal so it points from block center toward the goal region."""
-    n = _normalize(n_world)
-    if not np.any(n):
-        return n
-    to_goal = np.asarray(goal, dtype=float).reshape(3) - np.asarray(block_center, dtype=float).reshape(3)
-    if float(np.dot(n, to_goal)) < 0.0:
-        return -n
-    return n
+        unit = vec / mag
+        normals.append((float(unit[0]), float(unit[1]), float(unit[2])))
+
+    return tuple(normals)

@@ -23,10 +23,8 @@ scenarios:
         gap: 0.0
         tangential_offset: [0.0, 0.0]
         size: [0.9, 0.6, 0.6]
-      normal_query:
-        search_radius: 0.2
-        tangential_margin: 0.04
-        max_normals: 4
+      goal_normals:
+        - [1.0, 0.0, 0.0]
 
   on_top:
     blocks:
@@ -48,10 +46,8 @@ scenarios:
         face: top
         gap: 0.0
         tangential_offset: [0.0, 0.0]
-      normal_query:
-        search_radius: 0.2
-        tangential_margin: 0.04
-        max_normals: 3
+      goal_normals:
+        - [0.0, 0.0, 1.0]
 
   between:
     blocks:
@@ -73,7 +69,6 @@ scenarios:
         type: between
         ids: [left_block, right_block]
         position: [null, null, 0.35]
-      normal_query:
-        search_radius: 0.25
-        tangential_margin: 0.05
-        max_normals: 4
+      goal_normals:
+        - [1.0, 0.0, 0.0]
+        - [-1.0, 0.0, 0.0]
